@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Biface</title>
+<link href="https://fonts.googleapis.com/css2?family=Alex+Brush&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#fff; color:#000; font:16px/1.5 Helvetica, Arial, sans-serif; }
+  .w { max-width:480px; margin:0 auto; padding:32px 20px 64px; }
+  h1 { font:400 52px/1 'Alex Brush', cursive; margin:0 0 8px; }
+  .s { display:none; margin-top:24px; }
+  .s.on { display:block; }
+  label { display:block; margin:16px 0 4px; font-weight:700; font-size:14px; }
+  input, textarea { width:100%; font:inherit; padding:8px; border:1px solid #000; background:#fff; color:#000; border-radius:0; }
+  button { font:inherit; margin-top:16px; padding:8px 18px; background:#000; color:#fff; border:1px solid #000; cursor:pointer; }
+  button.o { background:#fff; color:#000; }
+  button:disabled { opacity:.5; }
+  #err { margin-top:12px; font-size:14px; }
+  code { display:block; border:1px solid #000; padding:8px; font-size:13px; word-break:break-all; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="w">
+  <h1>Biface</h1>
+  <p>Make your website easy for AI agents to use.</p>
+
+  <div class="s on" id="s1">
+    <label for="email">Email</label><input id="email" type="email" autocomplete="email">
+    <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">
+    <button onclick="auth('signup')">Sign up</button>
+    <button class="o" onclick="auth('login')">Log in</button>
+  </div>
+
+  <div class="s" id="s2">
+    <label for="type">What kind of business is it?</label>
+    <input id="type" placeholder="Tea shop, salon, clinic...">
+    <label for="tasks">What do visitors mostly do on your site?</label>
+    <textarea id="tasks" rows="2" placeholder="Buy things, book a time, ask a question..."></textarea>
+    <label for="never">Is there anything an agent should never do?</label>
+    <textarea id="never" rows="2" placeholder="Change prices, cancel orders..."></textarea>
+    <button onclick="show(3)">Next</button>
+  </div>
+
+  <div class="s" id="s3">
+    <label for="url">Your website link</label>
+    <input id="url" type="url" placeholder="https://yourshop.com">
+    <button id="go" onclick="build()">Build my layer</button>
+  </div>
+
+  <div class="s" id="s4">
+    <p>Your layer is live. It is <b id="size"></b> bytes.</p>
+    <label>Layer link</label><code id="lu"></code>
+    <label>Add this line inside the head of your website</label><code id="sn"></code>
+    <p>Agents that open your site will find the layer and use it.</p>
+  </div>
+
+  <div id="err"></div>
+</div>
+
+<script>
+  var tok = null;
+  try { tok = sessionStorage.getItem("t"); } catch (e) {}
+  var $ = function (i) { return document.getElementById(i); };
+  function show(n) {
+    document.querySelectorAll(".s").forEach(function (e) { e.classList.remove("on"); });
+    $("s" + n).classList.add("on");
+    $("err").textContent = "";
+  }
+  function fail(m) { $("err").textContent = m; }
+  function post(p, b) {
+    return fetch(p, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + (tok || "") }, body: JSON.stringify(b) })
+      .then(function (r) { return r.json(); });
+  }
+  function auth(mode) {
+    post("/api/auth", { mode: mode, email: $("email").value, password: $("pw").value }).then(function (d) {
+      if (d.error) return fail(d.error);
+      tok = d.token;
+      try { sessionStorage.setItem("t", tok); } catch (e) {}
+      show(2);
+    });
+  }
+  function build() {
+    $("go").disabled = true;
+    $("go").textContent = "Building...";
+    post("/api/build", { url: $("url").value, answers: { type: $("type").value, tasks: $("tasks").value, never: $("never").value } })
+      .then(function (d) {
+        $("go").disabled = false;
+        $("go").textContent = "Build my layer";
+        if (d.error) return fail(d.error);
+        $("size").textContent = d.bytes;
+        $("lu").textContent = d.layerUrl;
+        $("sn").textContent = d.snippet;
+        show(4);
+      })
+      .catch(function () { $("go").disabled = false; $("go").textContent = "Build my layer"; fail("Something went wrong. Try again."); });
+  }
+  if (tok) show(2);
+</script>
+</body>
+</html>
